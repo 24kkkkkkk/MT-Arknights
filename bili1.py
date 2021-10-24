@@ -1,13 +1,10 @@
-import time
-import json
-import socket
+import time,json,socket,requests
 from mitmproxy.options import Options
 from mitmproxy.tools.dump import DumpMaster
 from mitmproxy.tools.web.master import WebMaster
 from mitmproxy.tools.console.master import ConsoleMaster
 from mitmproxy.http import HTTPFlow, Request, Response
 from mitmproxy import master, http
-import requests
 from configparser import ConfigParser
 
 Config = {'port': 12450, 'mode': 'dump'}
@@ -57,17 +54,11 @@ class fcm:
                      'seqnum': '-1', 'lastLoginTime': '-1'}
         self.FirstLogin = True
         print('明日方舟防沉迷破解已在端口%s开启\n' % Config['port'])
-        self.fklist = ["line1-sdk-center-login-sh.biligame.net",
-                       "line2-sdk-center-login-sh.biligame.net",
-                       "line3-sdk-center-login-sh.biligame.net",
-                       "line3-sdkcenter-login.bilibiligame.net",
-                       "p.biligame.com",
-                       "line1-log.biligame.net",
-                       "line2-log.biligame.net",
-                       "line3-log.biligame.net",
-                       "line1-login.biligame.net",
-                       "line2-login.biligame.net",
-                       "line3-login.biligame.net"]
+        self.fklist = ["time/heartbeat",
+                       "api/client/session.renewal",
+                       "api/client/notice.list",
+                       "api/client/user.info",
+                       "user.token.oauth.login"]
         if self.check_user():
             while True:
                 j = input("确定这是正确的吗?[输入 Y(是) 或 N(否)]:").lower()
@@ -78,17 +69,18 @@ class fcm:
                 elif j == "n":
                     break
 
-    def http_connect(self, flow: HTTPFlow):
-        if (flow.request.host in self.fklist and not self.FirstLogin):
-            flow.kill()
-
     def request(self, flow: HTTPFlow):
-        if flow.request.url.startswith("https://as.hypergryph.com/online/v1/loginout"):
-            flow.kill()
+        for cgi in self.fklist:
+            if cgi in flow.request.url and "biligame.net" in flow.request.host and not self.FirstLogin:
+                ttime = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+                print("[%s]拦截请求防沉迷验证请求: %s" %
+                      (ttime,flow.request.url))
+                flow.kill()
+        if "api/client/can_pay" in flow.request.url and "biligame.net" in flow.request.host:
             ttime = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
-            self.User['lastLoginTime'] = ttime
-            print("[%s]记录用户操作: 退出游戏操作, 与服务器通信频道: %s,总计封包数: %s" %
-                  (ttime, self.User['secret'], self.User['seqnum']))
+            print("[%s]修改充值限制" %
+                      (ttime,flow.request.url))
+            flow.response.set_text('{code":0,"message":"ok","is_adult":1,"server_message":""}')
         if flow.request.url.startswith("https://ak-gs-b.hypergryph.com/account/login"):
             if self.FirstLogin:
                 j = json.loads(flow.request.get_text())
@@ -159,8 +151,6 @@ class fcm:
             j = json.loads(flow.response.get_text())
             self.User['name'] = j['user']['status']['nickName']
             self.FirstLogin = False
-        if "/app/v2/time/heartbeat" in flow.request.url:
-            flow.kill()
 
     def post_to_gs(self, header, url, data):
         retry_cnt = 3

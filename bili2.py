@@ -58,7 +58,12 @@ class fcm:
         flow.kill()
 
     def response(self, flow: HTTPFlow):
-        if "/app/v2/time/heartbeat" in flow.request.url:
+        if "api/client/can_pay" in flow.request.url and "biligame.net" in flow.request.host:
+            ttime = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+            print("[%s]修改充值限制" %
+                      (ttime,flow.request.url))
+            flow.response.set_text('{code":0,"message":"ok","is_adult":1,"server_message":""}')
+        if "/app/v2/time/heartbeat" in flow.request.url and "biligame.net" in flow.request.host:
             flow.kill()
 
 
